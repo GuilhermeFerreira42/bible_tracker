@@ -15,9 +15,36 @@
         .chapter-button.read { background-color: #2563eb; color: white; }
         .calendar-day.read { background-color: #2563eb; color: white; border-radius: 50%; }
         .comment-card { border-left: 4px solid #3b82f6; }
+
+        /* Estilos para o spinner (círculo giratório) */
+        .spinner {
+            width: 56px;
+            height: 56px;
+            border: 6px solid #4b5563; /* Cor da borda cinza */
+            border-top-color: #3b82f6; /* Cor da borda superior azul para indicar rotação */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Animação de rotação */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Classe para o efeito de fade-out */
+        #loading-overlay.fade-out {
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans">
+
+    <div id="loading-overlay" class="fixed top-0 left-0 w-full h-full bg-gray-900 flex justify-center items-center z-50">
+        <div class="spinner"></div>
+    </div>
 
     <div class="flex">
         <aside id="sidebar" class="bg-gray-800 text-white w-72 h-screen fixed top-0 left-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out overflow-y-auto">
@@ -71,6 +98,7 @@
                         <button id="download-data-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"><i class="fas fa-download mr-2"></i>Baixar Backup (JSON)</button>
                         <button id="upload-data-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"><i class="fas fa-upload mr-2"></i>Subir Backup (JSON)</button>
                         <input type="file" id="upload-input" accept=".json" class="hidden">
+                        <button id="clear-data-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"><i class="fas fa-trash-alt mr-2"></i>Limpar Dados</button>
                     </div>
                 </div>
                 <div class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8">
@@ -600,10 +628,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATA MANAGEMENT ---
     downloadBtn.addEventListener('click', async () => {
         try {
+            // Abre uma única transação de leitura para todas as tabelas, o que é mais seguro.
+            const tx = db.transaction([CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE, 'notes'], 'readonly');
+            
+            // Usa Promise.all para buscar todos os dados em paralelo dentro da mesma transação.
+            const [chapters, comments, marked_dates, notes] = await Promise.all([
+                getAllFromDB(tx.objectStore(CHAPTERS_STORE)),
+                getAllFromDB(tx.objectStore(COMMENTS_STORE)),
+                getAllFromDB(tx.objectStore(MARKED_DATES_STORE)),
+                getAllFromDB(tx.objectStore('notes')) // Adiciona a busca pelas anotações
+            ]);
+
+            await tx.complete;
+
+            // Monta o objeto de backup completo
             const backupData = {
-                chapters: await getAllFromDB(db.transaction(CHAPTERS_STORE).objectStore(CHAPTERS_STORE)),
-                comments: await getAllFromDB(db.transaction(COMMENTS_STORE).objectStore(COMMENTS_STORE)),
-                marked_dates: await getAllFromDB(db.transaction(MARKED_DATES_STORE).objectStore(MARKED_DATES_STORE)),
+                chapters,
+                comments,
+                marked_dates,
+                notes // Inclui as anotações no objeto final
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -621,6 +664,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // --- NOVA FUNÇÃO PARA LIMPAR TODOS OS DADOS ---
+    async function handleClearAllData() {
+        // Exibe uma caixa de confirmação dupla para segurança
+        const confirmationText = "Você tem CERTEZA que deseja apagar TODOS os dados do Bible Tracker? Esta ação é irreversível e removerá todo o seu progresso, comentários e anotações.";
+        if (!confirm(confirmationText)) {
+            return;
+        }
+        // Segunda confirmação para evitar cliques acidentais
+        if (!confirm("Confirmação final: Apagar todos os dados agora?")) {
+            return;
+        }
+
+        try {
+            // Fecha a conexão com o banco de dados, se estiver aberta, para permitir a exclusão
+            if (db) {
+                db.close();
+            }
+
+            // Solicita a exclusão do banco de dados inteiro pelo nome
+            const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+
+            // Usa uma Promise para aguardar o resultado da operação
+            await new Promise((resolve, reject) => {
+                deleteRequest.onsuccess = () => {
+                    console.log(`Banco de dados '${DB_NAME}' apagado com sucesso.`);
+                    resolve();
+                };
+                deleteRequest.onerror = (event) => {
+                    console.error(`Erro ao apagar o banco de dados:`, event.target.error);
+                    reject(event.target.error);
+                };
+                deleteRequest.onblocked = () => {
+                    console.warn('A exclusão do banco de dados está bloqueada. Feche outras abas com o aplicativo aberto.');
+                    reject(new Error('A exclusão foi bloqueada.'));
+                };
+            });
+
+            alert('Todos os dados foram apagados com sucesso! A página será recarregada.');
+            location.reload(); // Recarrega a página para iniciar do zero
+
+        } catch (error) {
+            alert(`Ocorreu um erro ao tentar apagar os dados: ${error.message}`);
+        }
+    }
+    
     uploadInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -628,15 +716,29 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = async (event) => {
             try {
                 const data = JSON.parse(event.target.result);
-                if (!data.chapters || !data.comments || !data.marked_dates) throw new Error('Formato de arquivo inválido.');
-                if (!confirm('Isso irá apagar todos os dados atuais e substituí-los pelo conteúdo do arquivo. Deseja continuar?')) return;
+                // Verifica se o arquivo de backup contém todas as chaves necessárias
+                if (!data.chapters || !data.comments || !data.marked_dates || !data.notes) {
+                    throw new Error('Formato de arquivo de backup inválido ou incompleto.');
+                }
+
+                if (!confirm('Isso irá apagar todos os dados atuais e substituí-los pelo conteúdo do arquivo. Deseja continuar?')) {
+                    return;
+                }
                 
-                for(const storeName of [CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE]) {
-                    const tx = db.transaction(storeName, 'readwrite');
-                    await clearDBStore(tx.objectStore(storeName));
-                    const dataKey = storeName.replace('_', ''); // chapters, comments, markeddates
-                    for(const item of data[storeName]) {
-                        await addToDB(tx.objectStore(storeName), item);
+                // Lista de todas as tabelas que serão restauradas
+                const storesToRestore = [
+                    { name: CHAPTERS_STORE, data: data.chapters },
+                    { name: COMMENTS_STORE, data: data.comments },
+                    { name: MARKED_DATES_STORE, data: data.marked_dates },
+                    { name: 'notes', data: data.notes } // Inclui as anotações na restauração
+                ];
+
+                for(const storeInfo of storesToRestore) {
+                    const tx = db.transaction(storeInfo.name, 'readwrite');
+                    const store = tx.objectStore(storeInfo.name);
+                    await clearDBStore(store); // Limpa a tabela
+                    for(const item of storeInfo.data) {
+                        await addToDB(store, item); // Adiciona os novos dados
                     }
                     await tx.complete;
                 }
@@ -644,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Dados importados com sucesso! A página será recarregada.');
                 location.reload();
             } catch (error) {
-                alert('Erro ao processar o arquivo JSON.');
+                alert(`Erro ao processar o arquivo JSON: ${error.message}`);
                 console.error(error);
             }
         };
@@ -655,6 +757,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.getElementById('hamburger-button').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('-translate-x-full'));
         document.getElementById('nav-menu').addEventListener('click', handleNavClick);
+        
+        // Adiciona o listener para o botão de limpeza
+        const clearDataBtn = document.getElementById('clear-data-btn');
+        if (clearDataBtn) {
+            clearDataBtn.addEventListener('click', handleClearAllData);
+        }
         
         bookPagesContainer.addEventListener('click', e => {
             const chapterBtn = e.target.closest('.chapter-button');
@@ -868,20 +976,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await updateUIForAllBooks();
     }
 
-    // --- APP INITIALIZATION ---
-    async function init() {
-        try {
-            await openDB();
-            createBookButtonsAndPages();
-            setupEventListeners();
-            await updateUIForAllBooks();
-            document.querySelector('.nav-button[data-target="dashboard"]').click();
-        } catch (error) {
-            console.error('Falha na inicialização:', error);
-            document.body.innerHTML = `<div class="text-white text-center p-8">Ocorreu um erro crítico. Por favor, recarregue a página. Detalhes: ${error}</div>`;
-        }
-    }
-
     async function loadAllCommentsAndNotes() {
         const listContainer = document.getElementById('all-comments-list');
         if (!listContainer) return;
@@ -937,6 +1031,37 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Erro ao carregar comentários e anotações:', error);
             listContainer.innerHTML = '<p class="text-red-500 text-center">Ocorreu um erro ao carregar os dados.</p>';
+        }
+    }
+
+    // --- APP INITIALIZATION ---
+    async function init() {
+        try {
+            await openDB();
+            createBookButtonsAndPages(); // Tarefa pesada
+            setupEventListeners();
+            await updateUIForAllBooks();
+            document.querySelector('.nav-button[data-target="dashboard"]').click();
+
+            // Pega o elemento de carregamento
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (loadingOverlay) {
+                // Adiciona a classe para iniciar o efeito de fade-out
+                loadingOverlay.classList.add('fade-out');
+                
+                // Remove o elemento do DOM após a animação para não atrapalhar os cliques
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 500); // O tempo deve ser o mesmo da transição do CSS
+            }
+
+        } catch (error) {
+            console.error('Falha na inicialização:', error);
+            // Em caso de erro, também esconde o loading para mostrar a mensagem
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if(loadingOverlay) loadingOverlay.style.display = 'none';
+            
+            document.body.innerHTML = `<div class="text-white text-center p-8">Ocorreu um erro crítico. Por favor, recarregue a página. Detalhes: ${error}</div>`;
         }
     }
 
