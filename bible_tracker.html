@@ -626,44 +626,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- DATA MANAGEMENT ---
-    downloadBtn.addEventListener('click', async () => {
-        try {
-            // Abre uma única transação de leitura para todas as tabelas, o que é mais seguro.
-            const tx = db.transaction([CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE, 'notes'], 'readonly');
-            
-            // Usa Promise.all para buscar todos os dados em paralelo dentro da mesma transação.
-            const [chapters, comments, marked_dates, notes] = await Promise.all([
-                getAllFromDB(tx.objectStore(CHAPTERS_STORE)),
-                getAllFromDB(tx.objectStore(COMMENTS_STORE)),
-                getAllFromDB(tx.objectStore(MARKED_DATES_STORE)),
-                getAllFromDB(tx.objectStore('notes')) // Adiciona a busca pelas anotações
-            ]);
+    function setupDataManagementListeners() {
+        const downloadBtn = document.getElementById('download-data-btn');
+        const uploadBtn = document.getElementById('upload-data-btn');
+        const uploadInput = document.getElementById('upload-input');
 
-            await tx.complete;
+        // Listener para o botão de Download
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', async () => {
+                try {
+                    // Abre uma única transação de leitura para todas as tabelas, o que é mais seguro.
+                    const tx = db.transaction([CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE, 'notes', 'explicitly_unmarked_dates'], 'readonly');
+                    
+                    // Usa Promise.all para buscar todos os dados em paralelo
+                    const [chapters, comments, marked_dates, notes, explicitly_unmarked_dates] = await Promise.all([
+                        getAllFromDB(tx.objectStore(CHAPTERS_STORE)),
+                        getAllFromDB(tx.objectStore(COMMENTS_STORE)),
+                        getAllFromDB(tx.objectStore(MARKED_DATES_STORE)),
+                        getAllFromDB(tx.objectStore('notes')),
+                        getAllFromDB(tx.objectStore('explicitly_unmarked_dates'))
+                    ]);
+                    await tx.complete;
 
-            // Monta o objeto de backup completo
-            const backupData = {
-                chapters,
-                comments,
-                marked_dates,
-                notes // Inclui as anotações no objeto final
-            };
-            
-            const dataStr = JSON.stringify(backupData, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `bible-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(a.href);
-            alert('Backup realizado com sucesso!');
-        } catch (error) {
-            console.error('Erro ao criar backup:', error);
-            alert('Ocorreu um erro ao criar o backup.');
+                    // Monta o objeto de backup completo, garantindo que tudo seja incluído
+                    const backupData = { chapters, comments, marked_dates, notes, explicitly_unmarked_dates };
+                    
+                    const dataStr = JSON.stringify(backupData, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `bible-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(a.href);
+                    alert('Backup realizado com sucesso!');
+                } catch (error) {
+                    console.error('Erro ao criar backup:', error);
+                    alert('Ocorreu um erro ao criar o backup.');
+                }
+            });
         }
-    });
-    
+
+        // Listener para o botão de Upload, que aciona o input de arquivo escondido
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => uploadInput.click());
+        }
+
+        // Listener para quando um arquivo é selecionado no input
+        if (uploadInput) {
+            uploadInput.addEventListener('change', e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        // Verifica se o arquivo de backup contém as chaves essenciais
+                        if (!data.chapters || !data.comments) {
+                            throw new Error('Formato de arquivo de backup inválido. Faltam dados essenciais.');
+                        }
+
+                        if (!confirm('Isso irá apagar todos os dados atuais e substituí-los pelo conteúdo do arquivo. Deseja continuar?')) {
+                            return;
+                        }
+                        
+                        // Lista de todas as tabelas que serão restauradas
+                        const storesToRestore = [
+                            { name: CHAPTERS_STORE, data: data.chapters },
+                            { name: COMMENTS_STORE, data: data.comments },
+                            { name: MARKED_DATES_STORE, data: data.marked_dates || [] },
+                            { name: 'notes', data: data.notes || [] },
+                            { name: 'explicitly_unmarked_dates', data: data.explicitly_unmarked_dates || [] }
+                        ];
+
+                        for(const storeInfo of storesToRestore) {
+                            // Verifica se a store existe antes de tentar acessá-la
+                            if (db.objectStoreNames.contains(storeInfo.name)) {
+                                const tx = db.transaction(storeInfo.name, 'readwrite');
+                                const store = tx.objectStore(storeInfo.name);
+                                await clearDBStore(store);
+                                for(const item of storeInfo.data) {
+                                    await addToDB(store, item);
+                                }
+                                await tx.complete;
+                            }
+                        }
+                        
+                        alert('Dados importados com sucesso! A página será recarregada.');
+                        location.reload();
+                    } catch (error) {
+                        alert(`Erro ao processar o arquivo JSON: ${error.message}`);
+                        console.error(error);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+    }
+
     // --- NOVA FUNÇÃO PARA LIMPAR TODOS OS DADOS ---
     async function handleClearAllData() {
         // Exibe uma caixa de confirmação dupla para segurança
@@ -708,53 +768,11 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`Ocorreu um erro ao tentar apagar os dados: ${error.message}`);
         }
     }
-    
-    uploadInput.addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const data = JSON.parse(event.target.result);
-                // Verifica se o arquivo de backup contém todas as chaves necessárias
-                if (!data.chapters || !data.comments || !data.marked_dates || !data.notes) {
-                    throw new Error('Formato de arquivo de backup inválido ou incompleto.');
-                }
-
-                if (!confirm('Isso irá apagar todos os dados atuais e substituí-los pelo conteúdo do arquivo. Deseja continuar?')) {
-                    return;
-                }
-                
-                // Lista de todas as tabelas que serão restauradas
-                const storesToRestore = [
-                    { name: CHAPTERS_STORE, data: data.chapters },
-                    { name: COMMENTS_STORE, data: data.comments },
-                    { name: MARKED_DATES_STORE, data: data.marked_dates },
-                    { name: 'notes', data: data.notes } // Inclui as anotações na restauração
-                ];
-
-                for(const storeInfo of storesToRestore) {
-                    const tx = db.transaction(storeInfo.name, 'readwrite');
-                    const store = tx.objectStore(storeInfo.name);
-                    await clearDBStore(store); // Limpa a tabela
-                    for(const item of storeInfo.data) {
-                        await addToDB(store, item); // Adiciona os novos dados
-                    }
-                    await tx.complete;
-                }
-                
-                alert('Dados importados com sucesso! A página será recarregada.');
-                location.reload();
-            } catch (error) {
-                alert(`Erro ao processar o arquivo JSON: ${error.message}`);
-                console.error(error);
-            }
-        };
-        reader.readAsText(file);
-    });
 
     // --- EVENT LISTENERS & NAVIGATION ---
     function setupEventListeners() {
+        setupDataManagementListeners(); // Adiciona os listeners de gerenciamento de dados
+
         document.getElementById('hamburger-button').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('-translate-x-full'));
         document.getElementById('nav-menu').addEventListener('click', handleNavClick);
         
