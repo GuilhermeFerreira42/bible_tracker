@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Tracker | Painel de Leitura</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%' y='50%' style='font-size: 90px;' text-anchor='middle' dominant-baseline='middle'>📖</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .chapter-button.read { background-color: #2563eb; color: white; }
+        .calendar-day.read { background-color: #2563eb; color: white; border-radius: 50%; }
+        .comment-card { border-left: 4px solid #3b82f6; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans">
+
+    <div class="flex">
+        <aside id="sidebar" class="bg-gray-800 text-white w-72 h-screen fixed top-0 left-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out overflow-y-auto">
+            <div class="p-4 border-b border-gray-700">
+                <h1 class="text-2xl font-bold text-center">
+                    <i class="fa-solid fa-bible text-blue-400"></i> Bible Tracker
+                </h1>
+            </div>
+            <nav id="nav-menu" class="p-4 space-y-2">
+                <button data-target="dashboard" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="fas fa-chart-bar w-6 text-center"></i>
+                    <span class="ml-4 font-semibold">Visão Geral</span>
+                </button>
+                <button data-target="calendar" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="fas fa-calendar-alt w-6 text-center"></i>
+                    <span class="ml-4 font-semibold">Calendário</span>
+                </button>
+                <button data-target="notes" class="nav-button w-full flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                    <i class="fas fa-pencil-alt w-6 text-center"></i>
+                    <span class="ml-4 font-semibold">Anotações</span>
+                </button>
+                <div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase">Livros da Bíblia</div>
+                <div id="book-buttons-container" class="space-y-1"></div>
+            </nav>
+        </aside>
+
+        <main id="main-content" class="flex-1 md:ml-72 p-4 md:p-8 transition-all duration-300 ease-in-out">
+            <header class="flex justify-between items-center mb-8">
+                <button id="hamburger-button" class="md:hidden text-2xl p-2">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h2 id="content-title" class="text-3xl font-bold text-white"></h2>
+            </header>
+
+            <section id="dashboard-content" class="content-section">
+                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4">Progresso Geral de Leitura</h3>
+                        <div class="w-full bg-gray-700 rounded-full h-8">
+                            <div id="overall-progress-bar" class="bg-gradient-to-r from-blue-500 to-teal-400 h-8 rounded-full text-center text-white font-bold flex items-center justify-center transition-all duration-500" style="width: 0%;">0%</div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4">Progresso por Testamento</h3>
+                         <div id="testament-progress-container" class="space-y-3"></div>
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8">
+                    <h3 class="text-lg font-semibold mb-4">Gerenciamento de Dados</h3>
+                    <div class="flex flex-wrap gap-4">
+                        <button id="download-data-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"><i class="fas fa-download mr-2"></i>Baixar Backup (JSON)</button>
+                        <button id="upload-data-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"><i class="fas fa-upload mr-2"></i>Subir Backup (JSON)</button>
+                        <input type="file" id="upload-input" accept=".json" class="hidden">
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Ver Todos os Comentários e Anotações</h3>
+                        <button id="toggle-all-comments-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Mostrar
+                        </button>
+                    </div>
+                    <div id="all-comments-list" class="hidden space-y-4 max-h-[40vh] overflow-y-auto pr-2"></div>
+                </div>
+            </section>
+            
+            <section id="calendar-content" class="content-section hidden">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <div class="flex justify-between items-center mb-6">
+                         <button id="prev-year-btn" class="text-xl p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-700 transition-colors"><i class="fas fa-angle-double-left"></i></button>
+                        <button id="prev-month-btn" class="text-xl p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-700 transition-colors"><i class="fas fa-chevron-left"></i></button>
+                        <h3 id="calendar-title" class="text-2xl font-bold text-white text-center"></h3>
+                        <button id="next-month-btn" class="text-xl p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-700 transition-colors"><i class="fas fa-chevron-right"></i></button>
+                        <button id="next-year-btn" class="text-xl p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-700 transition-colors"><i class="fas fa-angle-double-right"></i></button>
+                    </div>
+                    <div class="flex justify-center mb-4">
+                        <button id="toggle-view-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Ver Calendário Anual</button>
+                    </div>
+                    <div id="calendar-container" class="transition-all duration-500">
+                        <div id="monthly-view">
+                            <div id="calendar-weekdays" class="grid grid-cols-7 gap-1 md:gap-2 text-center font-bold text-sm text-gray-400 py-2"></div>
+                            <div id="calendar-grid" class="grid grid-cols-7 gap-1 md:gap-2 text-center"></div>
+                        </div>
+                        <div id="annual-view" class="hidden"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="notes-content" class="content-section hidden">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-white">Minhas Anotações e Reflexões</h3>
+                    <form id="note-form" class="mb-6">
+                        <textarea id="note-input" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="4" placeholder="Escreva sua oração, reflexão ou anotação aqui..." required></textarea>
+                        <button type="submit" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors w-full">Salvar Anotação</button>
+                    </form>
+                    <div id="notes-list" class="space-y-4"></div>
+                </div>
+            </section>
+
+            <div id="book-pages-container"></div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DATABASE AND APP CONFIG ---
+    const DB_NAME = 'bible-tracker-db';
+    const DB_VERSION = 4; // Atualizado de 3 para 4
+    const CHAPTERS_STORE = 'chapters';
+    const COMMENTS_STORE = 'comments';
+    const MARKED_DATES_STORE = 'marked_dates';
+    let db;
+
+    const BIBLE_BOOKS = {
+        "Antigo Testamento": [
+            { name: "Gênesis", chapters: 50 }, { name: "Êxodo", chapters: 40 }, { name: "Levítico", chapters: 27 },
+            { name: "Números", chapters: 36 }, { name: "Deuteronômio", chapters: 34 }, { name: "Josué", chapters: 24 },
+            { name: "Juízes", chapters: 21 }, { name: "Rute", chapters: 4 }, { name: "1 Samuel", chapters: 31 },
+            { name: "2 Samuel", chapters: 24 }, { name: "1 Reis", chapters: 22 }, { name: "2 Reis", chapters: 25 },
+            { name: "1 Crônicas", chapters: 29 }, { name: "2 Crônicas", chapters: 36 }, { name: "Esdras", chapters: 10 },
+            { name: "Neemias", chapters: 13 }, { name: "Ester", chapters: 10 }, { name: "Jó", chapters: 42 },
+            { name: "Salmos", chapters: 150 }, { name: "Provérbios", chapters: 31 }, { name: "Eclesiastes", chapters: 12 },
+            { name: "Cânticos", chapters: 8 }, { name: "Isaías", chapters: 66 }, { name: "Jeremias", chapters: 52 },
+            { name: "Lamentações", chapters: 5 }, { name: "Ezequiel", chapters: 48 }, { name: "Daniel", chapters: 12 },
+            { name: "Oséias", chapters: 14 }, { name: "Joel", chapters: 3 }, { name: "Amós", chapters: 9 },
+            { name: "Obadias", chapters: 1 }, { name: "Jonas", chapters: 4 }, { name: "Miquéias", chapters: 7 },
+            { name: "Naum", chapters: 3 }, { name: "Habacuque", chapters: 3 }, { name: "Sofonias", chapters: 3 },
+            { name: "Ageu", chapters: 2 }, { name: "Zacarias", chapters: 14 }, { name: "Malaquias", chapters: 4 }
+        ],
+        "Novo Testamento": [
+            { name: "Mateus", chapters: 28 }, { name: "Marcos", chapters: 16 }, { name: "Lucas", chapters: 24 },
+            { name: "João", chapters: 21 }, { name: "Atos", chapters: 28 }, { name: "Romanos", chapters: 16 },
+            { name: "1 Coríntios", chapters: 16 }, { name: "2 Coríntios", chapters: 13 }, { name: "Gálatas", chapters: 6 },
+            { name: "Efésios", chapters: 6 }, { name: "Filipenses", chapters: 4 }, { name: "Colossenses", chapters: 4 },
+            { name: "1 Tessalonicenses", chapters: 5 }, { name: "2 Tessalonicenses", chapters: 3 }, { name: "1 Timóteo", chapters: 6 },
+            { name: "2 Timóteo", chapters: 4 }, { name: "Tito", chapters: 3 }, { name: "Filemom", chapters: 1 },
+            { name: "Hebreus", chapters: 13 }, { name: "Tiago", chapters: 5 }, { name: "1 Pedro", chapters: 5 },
+            { name: "2 Pedro", chapters: 3 }, { name: "1 João", chapters: 5 }, { name: "2 João", chapters: 1 },
+            { name: "3 João", chapters: 1 }, { name: "Judas", chapters: 1 }, { name: "Apocalipse", chapters: 22 }
+        ]
+    };
+
+    // --- DOM ELEMENTS ---
+    const sidebar = document.getElementById('sidebar');
+    const bookPagesContainer = document.getElementById('book-pages-container');
+    const contentTitle = document.getElementById('content-title');
+    const downloadBtn = document.getElementById('download-data-btn');
+    const uploadBtn = document.getElementById('upload-data-btn');
+    const uploadInput = document.getElementById('upload-input');
+    
+    // Calendar
+    let calendarDate = new Date();
+    let isAnnualView = false;
+    const calendarContainer = document.getElementById('calendar-container');
+    const calendarTitle = document.getElementById('calendar-title');
+    const calendarGrid = document.getElementById('calendar-grid');
+    const calendarWeekdays = document.getElementById('calendar-weekdays');
+    const monthlyView = document.getElementById('monthly-view');
+    const annualView = document.getElementById('annual-view');
+    const toggleViewBtn = document.getElementById('toggle-view-btn');
+
+    // --- DATABASE FUNCTIONS ---
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = (event) => reject('Erro ao abrir o IndexedDB.');
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                const transaction = event.target.transaction;
+                
+                if (!db.objectStoreNames.contains(CHAPTERS_STORE)) {
+                    db.createObjectStore(CHAPTERS_STORE, { keyPath: 'id' });
+                }
+
+                if (!db.objectStoreNames.contains(COMMENTS_STORE)) {
+                   const commentsOS = db.createObjectStore(COMMENTS_STORE, { keyPath: 'id', autoIncrement: true });
+                   commentsOS.createIndex('chapterId', 'chapterId', { unique: false });
+                }
+                
+                // --- Changes for Version 2 ---
+                if (event.oldVersion < 2) {
+                    if (!db.objectStoreNames.contains(MARKED_DATES_STORE)) {
+                        db.createObjectStore(MARKED_DATES_STORE, { keyPath: 'date' });
+                    }
+                    const commentsOS = transaction.objectStore(COMMENTS_STORE);
+                    if (!commentsOS.indexNames.contains('book')) {
+                        commentsOS.createIndex('book', 'book', { unique: false });
+                    }
+                }
+
+                if (event.oldVersion < 3) {
+                    if (!db.objectStoreNames.contains('notes')) {
+                        db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
+                    }
+                }
+
+                if (event.oldVersion < 4) {
+                    if (!db.objectStoreNames.contains('explicitly_unmarked_dates')) {
+                        db.createObjectStore('explicitly_unmarked_dates', { keyPath: 'date' });
+                    }
+                }
+            };
+        });
+    }
+    
+    // --- UI INITIALIZATION ---
+    function createBookButtonsAndPages() {
+        for (const [testament, books] of Object.entries(BIBLE_BOOKS)) {
+            const testamentDiv = document.createElement('div');
+            testamentDiv.innerHTML = `<h3 class="px-3 py-2 text-xs font-semibold text-teal-300 uppercase">${testament}</h3>`;
+            document.getElementById('book-buttons-container').appendChild(testamentDiv);
+
+            books.forEach(book => {
+                const button = document.createElement('button');
+                button.className = 'nav-button w-full flex items-center p-2 pl-6 rounded-lg hover:bg-gray-700 transition-colors duration-200';
+                button.dataset.target = `book-${book.name}`;
+                button.innerHTML = `<i class="fa-solid fa-book-bookmark w-5 text-center"></i><span class="ml-3 font-medium">${book.name}</span>`;
+                document.getElementById('book-buttons-container').appendChild(button);
+                createBookPage(book);
+            });
+        }
+    }
+
+    function createBookPage(book) {
+        const section = document.createElement('section');
+        section.id = `book-${book.name}-content`;
+        section.className = 'content-section hidden';
+
+        let chaptersHTML = '';
+        for (let i = 1; i <= book.chapters; i++) {
+            chaptersHTML += `<button id="chapter-${book.name}-${i}" data-book="${book.name}" data-chapter="${i}" class="chapter-button h-12 w-12 flex items-center justify-center rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors">
+                ${i}
+            </button>`;
+        }
+
+        section.innerHTML = `
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <div class="xl:col-span-2 bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-bold mb-6 text-white">Capítulos de ${book.name}</h3>
+                    <div class="flex gap-2 mb-4">
+                        <button data-action="mark-all" data-book="${book.name}" class="action-all-btn flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition-colors text-sm">
+                            <i class="fas fa-check-double mr-2"></i>Marcar Todos
+                        </button>
+                        <button data-action="unmark-all" data-book="${book.name}" class="action-all-btn flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors text-sm">
+                            <i class="fas fa-times mr-2"></i>Desmarcar Todos
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-10 gap-3">
+                        ${chaptersHTML}
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-white">Comentários do Livro</h3>
+                    <div id="comments-section-${book.name}" class="space-y-4">
+                        <form id="comment-form" data-book="${book.name}" class="mb-4">
+                            <div class="flex gap-2 mb-2">
+                                <label for="chapter-input-${book.name}" class="sr-only">Capítulo</label>
+                                <input type="number" id="chapter-input-${book.name}" min="1" max="${book.chapters}" placeholder="Cap." class="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <label for="comment-input-${book.name}" class="sr-only">Comentário</label>
+                                <textarea id="comment-input-${book.name}" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Escreva seu comentário..." required></textarea>
+                            </div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors w-full">Adicionar Comentário</button>
+                        </form>
+                        <div id="comments-list-${book.name}" class="space-y-4 max-h-96 overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+            </div>`;
+        bookPagesContainer.appendChild(section);
+    }
+    
+    // --- CHAPTER AND COMMENT LOGIC ---
+    async function toggleChapterRead(bookName, chapterNum) {
+        const chapterId = `${bookName}-${chapterNum}`;
+        const transaction = db.transaction([CHAPTERS_STORE], 'readwrite');
+        const store = transaction.objectStore(CHAPTERS_STORE);
+        const chapter = await getFromDB(store, chapterId);
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
+
+        if (chapter) {
+            await deleteFromDB(store, chapterId);
+        } else {
+            await addToDB(store, { id: chapterId, book: bookName, chapter: chapterNum, read: true, date: today });
+        }
+        await transaction.complete;
+        updateUIForChapter(bookName, chapterNum);
+        updateDashboardProgress();
+        renderCalendar();
+    }
+    
+    async function loadCommentsForBook(bookName) {
+        const commentsListContainer = document.getElementById(`comments-list-${bookName}`);
+        if (!commentsListContainer) return;
+        
+        const transaction = db.transaction([COMMENTS_STORE], 'readonly');
+        const index = transaction.objectStore(COMMENTS_STORE).index('book');
+        const comments = await getAllFromIndexDB(index, bookName);
+
+        // Group comments by chapter
+        const commentsByChapter = comments.reduce((acc, comment) => {
+            const chapter = comment.chapterId.split('-')[1];
+            if (!acc[chapter]) acc[chapter] = [];
+            acc[chapter].push(comment);
+            return acc;
+        }, {});
+
+        commentsListContainer.innerHTML = '';
+        if (Object.keys(commentsByChapter).length === 0) {
+            commentsListContainer.innerHTML = '<p class="text-gray-500 text-center">Nenhum comentário para este livro.</p>';
+            return;
+        }
+        
+        // Sort chapters numerically and display
+        Object.keys(commentsByChapter).sort((a, b) => a - b).forEach(chapterNum => {
+            const chapterComments = commentsByChapter[chapterNum];
+            const chapterHeader = document.createElement('h4');
+            chapterHeader.className = "font-bold text-teal-300 border-b border-gray-700 pb-1 mb-2";
+            chapterHeader.textContent = `Capítulo ${chapterNum}`;
+            commentsListContainer.appendChild(chapterHeader);
+            
+            chapterComments.forEach(comment => {
+                const commentEl = document.createElement('div');
+                const dateString = comment.timestamp ? new Date(comment.timestamp).toLocaleString('pt-BR') : '';
+                commentEl.className = 'comment-card bg-gray-700/50 p-3 rounded-lg';
+                commentEl.innerHTML = `
+                    <p class="text-gray-300">${comment.text}</p>
+                    <div class="text-right text-xs text-gray-500 mt-2">
+                        ${dateString ? `<span>${dateString}</span> |` : ''}
+                        <button class="edit-comment-btn hover:text-blue-400" data-id="${comment.id}">Editar</button> |
+                        <button class="delete-comment-btn hover:text-red-400" data-id="${comment.id}">Excluir</button>
+                    </div>`;
+                commentsListContainer.appendChild(commentEl);
+            });
+        });
+    }
+
+    async function handleCommentSubmit(event) {
+        event.preventDefault();
+        const form = event.target;
+        const { book } = form.dataset;
+        let chapterNum = form.querySelector('input[type="number"]').value;
+        const text = form.querySelector('textarea').value;
+        if (!text.trim()) return;
+        if (!chapterNum) { chapterNum = '0'; }
+        const chapterId = `${book}-${chapterNum}`;
+        const comment = { chapterId, text, book, timestamp: new Date().getTime() };
+
+        const transaction = db.transaction([COMMENTS_STORE], 'readwrite');
+        const store = transaction.objectStore(COMMENTS_STORE);
+        await addToDB(store, comment);
+        await transaction.complete;
+        
+        form.reset(); // Clear the form
+        loadCommentsForBook(book); // Refresh comments for the entire book
+    }
+
+    async function handleCommentDelete(commentId, bookName) {
+        if (!confirm('Tem certeza que deseja excluir este comentário?')) return;
+        
+        const transaction = db.transaction([COMMENTS_STORE], 'readwrite');
+        await deleteFromDB(transaction.objectStore(COMMENTS_STORE), commentId);
+        await transaction.complete;
+        
+        loadCommentsForBook(bookName);
+    }
+    
+    async function handleCommentEdit(commentId, bookName) {
+        const transaction = db.transaction([COMMENTS_STORE], 'readonly');
+        const comment = await getFromDB(transaction.objectStore(COMMENTS_STORE), commentId);
+        if (!comment) return;
+
+        const newText = prompt('Edite seu comentário:', comment.text);
+        if (newText && newText.trim() !== comment.text) {
+            const writeTx = db.transaction([COMMENTS_STORE], 'readwrite');
+            const updatedComment = { ...comment, text: newText.trim() };
+            await updateInDB(writeTx.objectStore(COMMENTS_STORE), updatedComment);
+            await writeTx.complete;
+            loadCommentsForBook(bookName);
+        }
+    }
+
+    // --- UI UPDATES ---
+    async function updateUIForAllBooks() {
+        const transaction = db.transaction([CHAPTERS_STORE], 'readonly');
+        const allChapters = await getAllFromDB(transaction.objectStore(CHAPTERS_STORE));
+        const readChapters = new Set(allChapters.map(c => c.id));
+
+        document.querySelectorAll('.chapter-button').forEach(btn => {
+            btn.classList.toggle('read', readChapters.has(`${btn.dataset.book}-${btn.dataset.chapter}`));
+        });
+        updateDashboardProgress();
+    }
+    
+    function updateUIForChapter(bookName, chapterNum) {
+        const button = document.getElementById(`chapter-${bookName}-${chapterNum}`);
+        if (button) button.classList.toggle('read');
+    }
+
+    async function updateDashboardProgress() {
+        const transaction = db.transaction([CHAPTERS_STORE], 'readonly');
+        const allReadChapters = await getAllFromDB(transaction.objectStore(CHAPTERS_STORE));
+        
+        const totalChapters = Object.values(BIBLE_BOOKS).flat().reduce((sum, book) => sum + book.chapters, 0);
+        const totalRead = allReadChapters.length;
+        const overallPercentage = totalChapters > 0 ? (totalRead / totalChapters) * 100 : 0;
+        
+        const overallProgressBar = document.getElementById('overall-progress-bar');
+        overallProgressBar.style.width = `${overallPercentage}%`;
+        overallProgressBar.textContent = `${Math.round(overallPercentage)}%`;
+
+        const testamentProgressContainer = document.getElementById('testament-progress-container');
+        testamentProgressContainer.innerHTML = '';
+        for (const [testament, books] of Object.entries(BIBLE_BOOKS)) {
+            const testamentTotal = books.reduce((sum, book) => sum + book.chapters, 0);
+            const testamentRead = allReadChapters.filter(ch => books.some(b => b.name === ch.book)).length;
+            const testamentPercentage = testamentTotal > 0 ? (testamentRead / testamentTotal) * 100 : 0;
+            
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-semibold">${testament}</span>
+                    <span class="text-sm text-gray-400">${testamentRead} / ${testamentTotal}</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-4">
+                    <div class="bg-teal-500 h-4 rounded-full transition-all duration-500" style="width: ${testamentPercentage}%;"></div>
+                </div>`;
+            testamentProgressContainer.appendChild(div);
+        }
+    }
+
+    // --- CALENDAR LOGIC ---
+    async function getChapterReadDates() {
+        const tx = db.transaction(CHAPTERS_STORE, 'readonly');
+        const store = tx.objectStore(CHAPTERS_STORE);
+        const allChapters = await getAllFromDB(store);
+        return new Set(allChapters.map(c => c.date));
+    }
+
+    async function getAllMarkedDates() {
+        // Pega todas as fontes de datas "marcadas"
+        const chapterDates = await getChapterReadDates();
+        const markedTx = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readonly');
+        const manualMarked = await getAllFromDB(markedTx.objectStore(MARKED_DATES_STORE));
+        const manualMarkedDates = new Set(manualMarked.map(d => d.date));
+
+        // Pega os dias que foram explicitamente desmarcados
+        const explicitUnmarked = await getAllFromDB(markedTx.objectStore('explicitly_unmarked_dates'));
+        const explicitUnmarkedDates = new Set(explicitUnmarked.map(d => d.date));
+
+        // Lógica final: (Leituras de Capítulo U Marcações Manuais) - Desmarcações Explícitas
+        const finalMarkedDates = new Set([...chapterDates, ...manualMarkedDates]);
+        explicitUnmarkedDates.forEach(date => finalMarkedDates.delete(date));
+
+        return finalMarkedDates;
+    }
+
+    async function toggleMarkedDate(dateStr) {
+        // Primeiro, lemos todas as informações necessárias antes de escrever
+        const chapterDates = await getChapterReadDates();
+        const markedTxRead = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readonly');
+        const isMarkedManually = await getFromDB(markedTxRead.objectStore(MARKED_DATES_STORE), dateStr);
+        const isUnmarkedExplicitly = await getFromDB(markedTxRead.objectStore('explicitly_unmarked_dates'), dateStr);
+        await markedTxRead.complete;
+
+        // Agora, abrimos uma nova transação apenas para escrever
+        const writeTx = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readwrite');
+        const markedStore = writeTx.objectStore(MARKED_DATES_STORE);
+        const unmarkedStore = writeTx.objectStore('explicitly_unmarked_dates');
+
+        if (isMarkedManually) {
+            await deleteFromDB(markedStore, dateStr);
+        } else if (isUnmarkedExplicitly) {
+            await deleteFromDB(unmarkedStore, dateStr);
+            await addToDB(markedStore, { date: dateStr });
+        } else {
+            if (chapterDates.has(dateStr)) {
+                await addToDB(unmarkedStore, { date: dateStr });
+            } else {
+                await addToDB(markedStore, { date: dateStr });
+            }
+        }
+
+        await writeTx.complete;
+        renderCalendar();
+    }
+
+    async function renderCalendar() {
+        if (isAnnualView) {
+            monthlyView.classList.add('hidden');
+            annualView.classList.remove('hidden');
+            toggleViewBtn.textContent = 'Ver Calendário Mensal';
+            document.getElementById('prev-month-btn').style.display = 'none';
+            document.getElementById('next-month-btn').style.display = 'none';
+            await renderAnnualView();
+        } else {
+            monthlyView.classList.remove('hidden');
+            annualView.classList.add('hidden');
+            toggleViewBtn.textContent = 'Ver Calendário Anual';
+            document.getElementById('prev-month-btn').style.display = 'flex';
+            document.getElementById('next-month-btn').style.display = 'flex';
+            await renderMonthlyView();
+        }
+    }
+
+    async function renderMonthlyView() {
+        const month = calendarDate.getMonth();
+        const year = calendarDate.getFullYear();
+        const monthName = calendarDate.toLocaleString('pt-BR', { month: 'long' });
+        calendarTitle.textContent = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} de ${year}`;
+        
+        calendarWeekdays.innerHTML = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+            .map(day => `<div class="font-bold text-sm text-gray-400 py-2">${day}</div>`).join('');
+
+        calendarGrid.innerHTML = '';
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const allMarkedDates = await getAllMarkedDates();
+        const today = new Date();
+
+        for (let i = 0; i < firstDayOfMonth; i++) calendarGrid.innerHTML += '<div></div>';
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isMarked = allMarkedDates.has(dateStr);
+            const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+            
+            let classes = 'calendar-day h-10 w-10 flex items-center justify-center rounded-full cursor-pointer transition-colors';
+            if (isMarked) classes += ' read'; else classes += ' hover:bg-gray-700';
+            if (isToday) classes += ' border-2 border-teal-400';
+
+            calendarGrid.innerHTML += `<div class="${classes}" data-date="${dateStr}">${day}</div>`;
+        }
+    }
+
+    async function renderAnnualView() {
+        const year = calendarDate.getFullYear();
+        calendarTitle.textContent = `Ano de ${year}`;
+        annualView.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>`;
+        const container = annualView.querySelector('.grid');
+        const allMarkedDates = await getAllMarkedDates();
+        const today = new Date();
+
+        for (let month = 0; month < 12; month++) {
+            const monthDate = new Date(year, month);
+            const monthName = monthDate.toLocaleString('pt-BR', { month: 'long' });
+            
+            let monthHTML = `<div class="bg-gray-800 p-3 rounded-lg"><h4 class="font-bold text-center mb-2">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</h4>`;
+            monthHTML += `<div class="grid grid-cols-7 gap-1 text-center text-xs">`;
+            ['D','S','T','Q','Q','S','S'].forEach(d => { monthHTML += `<div class="font-semibold text-gray-500">${d}</div>`; });
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDayOfMonth; i++) monthHTML += '<div></div>';
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isMarked = allMarkedDates.has(dateStr);
+                const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+                
+                let classes = 'calendar-day h-6 w-6 flex items-center justify-center rounded-full cursor-pointer transition-colors';
+                if (isMarked) classes += ' bg-blue-600 text-white'; else classes += ' hover:bg-gray-700';
+                if (isToday) classes += ' border-2 border-teal-400';
+                 
+                monthHTML += `<div class="${classes}" data-date="${dateStr}">${day}</div>`;
+            }
+
+            monthHTML += `</div></div>`;
+            container.innerHTML += monthHTML;
+        }
+    }
+
+    // --- DATA MANAGEMENT ---
+    downloadBtn.addEventListener('click', async () => {
+        try {
+            const backupData = {
+                chapters: await getAllFromDB(db.transaction(CHAPTERS_STORE).objectStore(CHAPTERS_STORE)),
+                comments: await getAllFromDB(db.transaction(COMMENTS_STORE).objectStore(COMMENTS_STORE)),
+                marked_dates: await getAllFromDB(db.transaction(MARKED_DATES_STORE).objectStore(MARKED_DATES_STORE)),
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `bible-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+            alert('Backup realizado com sucesso!');
+        } catch (error) {
+            console.error('Erro ao criar backup:', error);
+            alert('Ocorreu um erro ao criar o backup.');
+        }
+    });
+    
+    uploadInput.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (!data.chapters || !data.comments || !data.marked_dates) throw new Error('Formato de arquivo inválido.');
+                if (!confirm('Isso irá apagar todos os dados atuais e substituí-los pelo conteúdo do arquivo. Deseja continuar?')) return;
+                
+                for(const storeName of [CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE]) {
+                    const tx = db.transaction(storeName, 'readwrite');
+                    await clearDBStore(tx.objectStore(storeName));
+                    const dataKey = storeName.replace('_', ''); // chapters, comments, markeddates
+                    for(const item of data[storeName]) {
+                        await addToDB(tx.objectStore(storeName), item);
+                    }
+                    await tx.complete;
+                }
+                
+                alert('Dados importados com sucesso! A página será recarregada.');
+                location.reload();
+            } catch (error) {
+                alert('Erro ao processar o arquivo JSON.');
+                console.error(error);
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    // --- EVENT LISTENERS & NAVIGATION ---
+    function setupEventListeners() {
+        document.getElementById('hamburger-button').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('-translate-x-full'));
+        document.getElementById('nav-menu').addEventListener('click', handleNavClick);
+        
+        bookPagesContainer.addEventListener('click', e => {
+            const chapterBtn = e.target.closest('.chapter-button');
+            if (chapterBtn) {
+                toggleChapterRead(chapterBtn.dataset.book, parseInt(chapterBtn.dataset.chapter));
+                return;
+            }
+            const actionAllBtn = e.target.closest('.action-all-btn');
+            if (actionAllBtn) {
+                const { action, book } = actionAllBtn.dataset;
+                toggleAllChapters(book, action === 'mark-all');
+                return;
+            }
+            const commentActionBtn = e.target.closest('.edit-comment-btn, .delete-comment-btn');
+            if (commentActionBtn) {
+                const commentsSection = commentActionBtn.closest('[id^="comments-section-"]');
+                if (commentsSection) {
+                    const bookName = commentsSection.id.replace('comments-section-', '');
+                    const commentId = parseInt(commentActionBtn.dataset.id);
+                    if (commentActionBtn.classList.contains('delete-comment-btn')) {
+                        handleCommentDelete(commentId, bookName);
+                    } else if (commentActionBtn.classList.contains('edit-comment-btn')) {
+                        handleCommentEdit(commentId, bookName);
+                    }
+                }
+            }
+        });
+
+        bookPagesContainer.addEventListener('submit', e => {
+            if (e.target.matches('#comment-form')) {
+                handleCommentSubmit(e);
+            }
+        });
+
+        calendarContainer.addEventListener('click', e => {
+            const dayCell = e.target.closest('.calendar-day');
+            if(dayCell && dayCell.dataset.date) {
+                toggleMarkedDate(dayCell.dataset.date);
+            }
+        });
+
+        // Calendar navigation
+        document.getElementById('prev-month-btn').addEventListener('click', () => { calendarDate.setMonth(calendarDate.getMonth() - 1); renderCalendar(); });
+        document.getElementById('next-month-btn').addEventListener('click', () => { calendarDate.setMonth(calendarDate.getMonth() + 1); renderCalendar(); });
+        document.getElementById('prev-year-btn').addEventListener('click', () => { calendarDate.setFullYear(calendarDate.getFullYear() - 1); renderCalendar(); });
+        document.getElementById('next-year-btn').addEventListener('click', () => { calendarDate.setFullYear(calendarDate.getFullYear() + 1); renderCalendar(); });
+        toggleViewBtn.addEventListener('click', () => { isAnnualView = !isAnnualView; renderCalendar(); });
+
+        const notesContent = document.getElementById('notes-content');
+        if (notesContent) {
+            notesContent.addEventListener('submit', e => {
+                if (e.target.id === 'note-form') {
+                    handleNoteSubmit(e);
+                }
+            });
+            notesContent.addEventListener('click', e => {
+                const deleteBtn = e.target.closest('.delete-note-btn');
+                if (deleteBtn) {
+                    handleNoteDelete(parseInt(deleteBtn.dataset.id));
+                    return;
+                }
+
+                const editBtn = e.target.closest('.edit-note-btn');
+                if (editBtn) {
+                    handleNoteEdit(parseInt(editBtn.dataset.id));
+                }
+            });
+        }
+
+        const toggleAllCommentsBtn = document.getElementById('toggle-all-comments-btn');
+        if (toggleAllCommentsBtn) {
+            toggleAllCommentsBtn.addEventListener('click', () => {
+                const list = document.getElementById('all-comments-list');
+                const isHidden = list.classList.toggle('hidden');
+
+                if (!isHidden && !list.dataset.loaded) {
+                    loadAllCommentsAndNotes();
+                    list.dataset.loaded = "true";
+                }
+
+                toggleAllCommentsBtn.textContent = isHidden ? 'Mostrar' : 'Ocultar';
+            });
+        }
+    }
+
+    function handleNavClick(e) {
+        const button = e.target.closest('.nav-button');
+        if (!button) return;
+        
+        const targetId = button.dataset.target;
+        document.querySelectorAll('.content-section').forEach(section => section.classList.add('hidden'));
+        const targetSection = document.getElementById(`${targetId}-content`);
+        if (targetSection) targetSection.classList.remove('hidden');
+
+        const bookName = targetId.startsWith('book-') ? targetId.substring(5) : null;
+        if (targetId === 'dashboard') {
+            contentTitle.textContent = 'Visão Geral';
+            updateDashboardProgress();
+        } else if (targetId === 'calendar') {
+            contentTitle.textContent = 'Calendário de Leitura';
+            renderCalendar();
+        } else if (bookName) {
+            contentTitle.textContent = bookName;
+            loadCommentsForBook(bookName);
+        } else if (targetId === 'notes') {
+            contentTitle.textContent = 'Minhas Anotações';
+            loadNotes();
+        }
+
+        document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('bg-blue-600', 'text-white'));
+        button.classList.add('bg-blue-600', 'text-white');
+        if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
+    }
+
+    // --- DB UTILITY FUNCTIONS ---
+    function getFromDB(store, id) { return new Promise((r,j) => { const req = store.get(id); req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); }); }
+    function getAllFromDB(store) { return new Promise((r,j) => { const req = store.getAll(); req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); }); }
+    function getAllFromIndexDB(index, query) { return new Promise((r,j) => { const req = index.getAll(query); req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); }); }
+    function addToDB(store, value) { return new Promise((r,j) => { const req = store.add(value); req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); }); }
+    function updateInDB(store, value) { return new Promise((r,j) => { const req = store.put(value); req.onsuccess = () => r(req.result); req.onerror = () => j(req.error); }); }
+    function deleteFromDB(store, id) { return new Promise((r,j) => { const req = store.delete(id); req.onsuccess = () => r(); req.onerror = () => j(req.error); }); }
+    function clearDBStore(store) { return new Promise((r,j) => { const req = store.clear(); req.onsuccess = () => r(); req.onerror = () => j(req.error); }); }
+
+    // --- NOTES LOGIC ---
+    async function loadNotes() {
+        const notesList = document.getElementById('notes-list');
+        if (!notesList) return;
+        const tx = db.transaction('notes', 'readonly');
+        const store = tx.objectStore('notes');
+        const notes = await getAllFromDB(store);
+        notesList.innerHTML = '';
+        if (notes.length === 0) {
+            notesList.innerHTML = '<p class="text-gray-500 text-center">Nenhuma anotação salva ainda.</p>';
+            return;
+        }
+        notes.reverse().forEach(note => {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'comment-card bg-gray-700/50 p-4 rounded-lg';
+            noteEl.innerHTML = `
+                <p class="text-gray-300 whitespace-pre-wrap">${note.text}</p>
+                <div class="text-right text-xs text-gray-500 mt-2">
+                    <span>${new Date(note.timestamp).toLocaleString('pt-BR')}</span> |
+                    <button class="edit-note-btn hover:text-blue-400" data-id="${note.id}">Editar</button> |
+                    <button class="delete-note-btn hover:text-red-400" data-id="${note.id}">Excluir</button>
+                </div>`;
+            notesList.appendChild(noteEl);
+        });
+    }
+
+    async function handleNoteSubmit(event) {
+        event.preventDefault();
+        const input = document.getElementById('note-input');
+        const text = input.value;
+        if (!text.trim()) return;
+        const note = { text: text, timestamp: new Date().getTime() };
+        const tx = db.transaction('notes', 'readwrite');
+        await addToDB(tx.objectStore('notes'), note);
+        await tx.complete;
+        input.value = '';
+        loadNotes();
+    }
+
+    async function handleNoteDelete(noteId) {
+        if (!confirm('Tem certeza que deseja excluir esta anotação?')) return;
+        const tx = db.transaction('notes', 'readwrite');
+        await deleteFromDB(tx.objectStore('notes'), noteId);
+        await tx.complete;
+        loadNotes();
+    }
+
+    async function handleNoteEdit(noteId) {
+        const tx = db.transaction('notes', 'readonly');
+        const note = await getFromDB(tx.objectStore('notes'), noteId);
+        if (!note) return;
+        const newText = prompt('Edite sua anotação:', note.text);
+        if (newText && newText.trim() !== note.text) {
+            const writeTx = db.transaction('notes', 'readwrite');
+            note.text = newText;
+            await updateInDB(writeTx.objectStore('notes'), note);
+            await writeTx.complete;
+            loadNotes();
+        }
+    }
+
+    // --- BULK CHAPTER TOGGLE LOGIC ---
+    async function toggleAllChapters(bookName, markAsRead) {
+        const book = Object.values(BIBLE_BOOKS).flat().find(b => b.name === bookName);
+        if (!book) return;
+        const confirmationText = markAsRead
+            ? `Tem certeza que deseja marcar todos os ${book.chapters} capítulos de ${bookName} como lidos?`
+            : `Tem certeza que deseja desmarcar todos os capítulos de ${bookName}?`;
+        if (!confirm(confirmationText)) return;
+        const tx = db.transaction(CHAPTERS_STORE, 'readwrite');
+        const store = tx.objectStore(CHAPTERS_STORE);
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
+
+        for (let i = 1; i <= book.chapters; i++) {
+            const chapterId = `${bookName}-${i}`;
+            if (markAsRead) {
+                await store.put({ id: chapterId, book: bookName, chapter: i, read: true, date: today });
+            } else {
+                await store.delete(chapterId);
+            }
+        }
+        await tx.complete;
+        await updateUIForAllBooks();
+    }
+
+    // --- APP INITIALIZATION ---
+    async function init() {
+        try {
+            await openDB();
+            createBookButtonsAndPages();
+            setupEventListeners();
+            await updateUIForAllBooks();
+            document.querySelector('.nav-button[data-target="dashboard"]').click();
+        } catch (error) {
+            console.error('Falha na inicialização:', error);
+            document.body.innerHTML = `<div class="text-white text-center p-8">Ocorreu um erro crítico. Por favor, recarregue a página. Detalhes: ${error}</div>`;
+        }
+    }
+
+    async function loadAllCommentsAndNotes() {
+        const listContainer = document.getElementById('all-comments-list');
+        if (!listContainer) return;
+        listContainer.innerHTML = '<p class="text-gray-400">Carregando...</p>';
+
+        try {
+            // Usa Promise.all para buscar dados de ambas as fontes em paralelo
+            const [bookComments, notes] = await Promise.all([
+                getAllFromDB(db.transaction(COMMENTS_STORE, 'readonly').objectStore(COMMENTS_STORE)),
+                getAllFromDB(db.transaction('notes', 'readonly').objectStore('notes'))
+            ]);
+
+            const formattedBookComments = bookComments.map(c => {
+                // Adiciona uma verificação para o capítulo '0' (comentário geral)
+                const chapterLabel = c.chapterId.endsWith('-0')
+                    ? 'Geral'
+                    : `Cap. ${c.chapterId.split('-')[1]}`;
+                return {
+                    type: 'Comentário',
+                    source: `${c.book} ${chapterLabel}`,
+                    text: c.text,
+                    timestamp: c.timestamp
+                };
+            });
+
+            const formattedNotes = notes.map(n => ({
+                type: 'Anotação',
+                source: 'Pessoal',
+                text: n.text,
+                timestamp: n.timestamp
+            }));
+
+            const allEntries = [...formattedBookComments, ...formattedNotes];
+            allEntries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+            if (allEntries.length === 0) {
+                listContainer.innerHTML = '<p class="text-gray-500 text-center">Nenhum comentário ou anotação encontrado.</p>';
+                return;
+            }
+
+            listContainer.innerHTML = allEntries.map(entry => {
+                const dateString = entry.timestamp ? new Date(entry.timestamp).toLocaleString('pt-BR') : 'Sem data';
+                return `
+                    <div class="comment-card bg-gray-700/50 p-3 rounded-lg">
+                        <p class="text-gray-300 whitespace-pre-wrap">${entry.text}</p>
+                        <div class="text-xs text-gray-400 mt-2 flex justify-between items-center">
+                            <span class="font-bold text-teal-300">${entry.type} - ${entry.source}</span>
+                            <span class="text-gray-500">${dateString}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Erro ao carregar comentários e anotações:', error);
+            listContainer.innerHTML = '<p class="text-red-500 text-center">Ocorreu um erro ao carregar os dados.</p>';
+        }
+    }
+
+    init();
+});
+</script>
+
+</body>
+</html>
