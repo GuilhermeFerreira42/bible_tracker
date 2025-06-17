@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Processador de Textos da Bíblia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+  />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      font-family: "Roboto", sans-serif;
+      background: #f9fafb;
+      min-height: 100vh;
+    }
+    /* Scrollbar for output areas */
+    .outputArea::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .outputArea::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    .outputArea::-webkit-scrollbar-thumb {
+      background: #3b82f6;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="text-gray-800">
+  <div class="max-w-4xl mx-auto p-6 sm:p-10">
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-700 drop-shadow-md">
+        <i class="fas fa-book-open mr-2"></i>Processador de Textos da Bíblia
+      </h1>
+      <p class="mt-2 text-gray-600 sm:text-lg max-w-xl mx-auto">
+        Ferramenta para limpar versículos e converter capítulos em texto por extenso.
+      </p>
+    </header>
+
+    <nav
+      class="flex justify-center space-x-4 mb-8 border-b-4 border-blue-600"
+      role="tablist"
+      aria-label="Tabs de processamento"
+    >
+      <button
+        id="tabBtn1"
+        class="tab-btn relative py-3 px-6 text-blue-700 font-semibold border-b-4 border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        aria-selected="true"
+        role="tab"
+        aria-controls="tab1"
+        tabindex="0"
+      >
+        <i class="fas fa-broom mr-2"></i>1. Limpar Versículos
+        <span
+          class="absolute -bottom-4 left-0 right-0 h-1 bg-blue-600 rounded-t-md"
+        ></span>
+      </button>
+      <button
+        id="tabBtn2"
+        class="tab-btn relative py-3 px-6 text-gray-500 hover:text-blue-600 font-semibold border-b-4 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-400"
+        aria-selected="false"
+        role="tab"
+        aria-controls="tab2"
+        tabindex="-1"
+      >
+        <i class="fas fa-file-alt mr-2"></i>2. Capítulos por Extenso
+      </button>
+    </nav>
+
+    <section
+      id="tab1"
+      class="tab-content block bg-white rounded-xl shadow-lg p-6 sm:p-8"
+      role="tabpanel"
+      aria-labelledby="tabBtn1"
+    >
+      <div class="space-y-4">
+        <p class="text-gray-700 text-base sm:text-lg leading-relaxed">
+          Esta função remove os números dos versículos (ex: <span class="font-mono">"1-"</span>, <span class="font-mono">"e 13-"</span>) do início das linhas. Títulos de livros (ex: <span class="font-mono">1º Samuel</span>) e capítulos são preservados.
+        </p>
+
+        <label
+          for="fileInput1"
+          class="block text-sm font-medium text-gray-700"
+          >Selecione um arquivo <strong>TXT</strong>:</label
+        >
+        <input
+          type="file"
+          id="fileInput1"
+          accept=".txt"
+          class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+        />
+
+        <div class="flex flex-wrap gap-3 mt-2">
+          <button
+            id="startBtn1"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <i class="fas fa-play"></i> Iniciar Processamento
+          </button>
+          <button
+            id="stopBtn1"
+            class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-400"
+            disabled
+          >
+            <i class="fas fa-stop"></i> Parar
+          </button>
+          <a
+            id="downloadBtn1"
+            href="#"
+            download=""
+            class="hidden flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition focus:outline-none focus:ring-2 focus:ring-green-400"
+            ><i class="fas fa-download"></i> Baixar Resultado</a
+          >
+        </div>
+
+        <progress
+          id="progress1"
+          value="0"
+          max="0"
+          class="w-full h-3 rounded-md overflow-hidden appearance-none"
+          style="display:none"
+        ></progress>
+        <p
+          id="status1"
+          class="text-sm text-gray-600 min-h-[1.5rem] font-medium"
+          aria-live="polite"
+        ></p>
+
+        <h2 class="mt-6 text-xl font-semibold text-blue-700 border-b border-blue-300 pb-1">
+          Pré-visualização do Resultado:
+        </h2>
+        <div
+          id="outputArea1"
+          class="outputArea mt-2 p-4 h-72 overflow-y-auto rounded-md border border-gray-300 bg-gray-50 whitespace-pre-wrap font-mono text-sm text-gray-800 shadow-inner"
+          tabindex="0"
+          aria-label="Área de pré-visualização do resultado da limpeza de versículos"
+        ></div>
+      </div>
+    </section>
+
+    <section
+      id="tab2"
+      class="tab-content hidden bg-white rounded-xl shadow-lg p-6 sm:p-8"
+      role="tabpanel"
+      aria-labelledby="tabBtn2"
+      tabindex="0"
+    >
+      <div class="space-y-4">
+        <p class="text-gray-700 text-base sm:text-lg leading-relaxed">
+          Esta função encontra <span class="font-mono">"Capítulo 1"</span>, <span class="font-mono">"Capítulo 2"</span>, etc., e substitui o número pela sua versão por extenso em maiúsculas (ex: <span class="font-mono">"CAPÍTULO UM."</span>).
+        </p>
+
+        <label
+          for="fileInput2"
+          class="block text-sm font-medium text-gray-700"
+          >Selecione um arquivo <strong>TXT</strong>:</label
+        >
+        <input
+          type="file"
+          id="fileInput2"
+          accept=".txt"
+          class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+        />
+
+        <div class="flex flex-wrap gap-3 mt-2">
+          <button
+            id="startBtn2"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <i class="fas fa-play"></i> Iniciar Processamento
+          </button>
+          <button
+            id="stopBtn2"
+            class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-400"
+            disabled
+          >
+            <i class="fas fa-stop"></i> Parar
+          </button>
+          <a
+            id="downloadBtn2"
+            href="#"
+            download=""
+            class="hidden flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition focus:outline-none focus:ring-2 focus:ring-green-400"
+            ><i class="fas fa-download"></i> Baixar Resultado</a
+          >
+        </div>
+
+        <progress
+          id="progress2"
+          value="0"
+          max="0"
+          class="w-full h-3 rounded-md overflow-hidden appearance-none"
+          style="display:none"
+        ></progress>
+        <p
+          id="status2"
+          class="text-sm text-gray-600 min-h-[1.5rem] font-medium"
+          aria-live="polite"
+        ></p>
+
+        <h2 class="mt-6 text-xl font-semibold text-blue-700 border-b border-blue-300 pb-1">
+          Pré-visualização do Resultado:
+        </h2>
+        <div
+          id="outputArea2"
+          class="outputArea mt-2 p-4 h-72 overflow-y-auto rounded-md border border-gray-300 bg-gray-50 whitespace-pre-wrap font-mono text-sm text-gray-800 shadow-inner"
+          tabindex="0"
+          aria-label="Área de pré-visualização do resultado da conversão de capítulos"
+        ></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // --- LÓGICA GERAL ---
+    function setupTab(tabId) {
+      const fileInput = document.getElementById(`fileInput${tabId}`);
+      const startBtn = document.getElementById(`startBtn${tabId}`);
+      const stopBtn = document.getElementById(`stopBtn${tabId}`);
+      const progressEl = document.getElementById(`progress${tabId}`);
+      const statusEl = document.getElementById(`status${tabId}`);
+      const downloadBtn = document.getElementById(`downloadBtn${tabId}`);
+      const outputArea = document.getElementById(`outputArea${tabId}`);
+
+      let stopFlag = { stopped: false };
+
+      startBtn.addEventListener("click", async () => {
+        if (!fileInput.files.length) {
+          alert("Por favor, selecione um arquivo primeiro.");
+          return;
+        }
+        const file = fileInput.files[0];
+        stopFlag.stopped = false;
+
+        // Atualiza interface
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        downloadBtn.style.display = "none";
+        statusEl.textContent = "Lendo o arquivo...";
+        outputArea.textContent = "";
+
+        try {
+          const text = await file.text();
+          const lines = text.split(/\r?\n/);
+
+          statusEl.textContent = "Processando...";
+
+          let callback;
+          if (tabId === 1) {
+            // =================================================================
+            // INÍCIO DA LÓGICA ATUALIZADA PARA A ABA 1
+            // =================================================================
+            const livroRe = /^\s*[1-3][ºª]\s+[A-ZÀ-Ú]/i;
+            const capituloRe = /^\s*cap[ií]tulo\s+\d+/i;
+            
+            // Regex nova e mais poderosa para remover marcadores de versículos
+            const versiculoRe = /^[\s\dºªe,.-]+?(?=[A-ZÀ-Ú"“])/;
+
+            callback = (line) => {
+              // PASSO 1: Protege títulos de livros e capítulos
+              if (livroRe.test(line) || capituloRe.test(line)) {
+                return line;
+              }
+              // PASSO 2: Remove os marcadores de versículos do resto
+              return line.replace(versiculoRe, "");
+            };
+            // =================================================================
+            // FIM DA LÓGICA ATUALIZADA
+            // =================================================================
+
+          } else {
+            // Lógica da Aba 2: Substituir Capítulos (inalterada)
+            const capituloExtensoRe = /\b(Cap[ií]tulo)\s+(\d+)/gi;
+
+            callback = (line) =>
+              line.replace(capituloExtensoRe, (_, cap, num) => {
+                const n = parseInt(num, 10);
+                const ext = (numerosPorExtenso[n] || num).toUpperCase();
+                return `${cap.toUpperCase()} ${ext}`;
+              });
+          }
+
+          await processLines(lines, callback, progressEl, statusEl, stopFlag);
+
+          const result = lines.join("\n");
+          outputArea.textContent = result;
+
+          if (!stopFlag.stopped) {
+            const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
+            downloadBtn.href = URL.createObjectURL(blob);
+            const suffix = tabId === 1 ? "_limpo.txt" : "_cap_extenso.txt";
+            downloadBtn.download = file.name.replace(/\.txt$/i, suffix);
+            downloadBtn.style.display = "inline-flex";
+          }
+        } catch (error) {
+          statusEl.textContent = `Erro: ${error.message}`;
+          console.error(error);
+        } finally {
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      });
+
+      stopBtn.addEventListener("click", () => {
+        stopFlag.stopped = true;
+      });
+    }
+
+    async function processLines(lines, callback, progressEl, statusEl, stopFlag) {
+      progressEl.max = lines.length;
+      progressEl.value = 0;
+      progressEl.style.display = "block";
+
+      for (let i = 0; i < lines.length; i++) {
+        if (stopFlag.stopped) break;
+        lines[i] = callback(lines[i]);
+
+        if (i % 100 === 0) {
+          progressEl.value = i + 1;
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+      progressEl.value = lines.length; // Garante que a barra chegue a 100%
+
+      progressEl.style.display = "none";
+      statusEl.textContent = stopFlag.stopped
+        ? "Processo parado pelo usuário."
+        : "Processamento concluído!";
+    }
+
+    // --- GERENCIAMENTO DAS ABAS ---
+    const tabContainer = document.querySelector("nav"); // Alterado para nav para maior precisão
+    const tabContents = document.querySelectorAll(".tab-content");
+    const tabButtons = document.querySelectorAll(".tab-btn");
+
+    tabButtons.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const selectedId = btn.id;
+        const tabId = selectedId.replace("tabBtn", "");
+
+        tabButtons.forEach((b) => {
+          b.classList.remove("border-blue-600", "text-blue-700");
+          b.classList.add("text-gray-500", "border-transparent");
+          b.setAttribute("aria-selected", "false");
+          b.setAttribute("tabindex", "-1");
+          const span = b.querySelector("span");
+          if (span) span.remove();
+        });
+
+        btn.classList.add("border-blue-600", "text-blue-700");
+        btn.classList.remove("text-gray-500", "border-transparent");
+        btn.setAttribute("aria-selected", "true");
+        btn.setAttribute("tabindex", "0");
+        if (!btn.querySelector("span")) {
+          const underline = document.createElement("span");
+          underline.className =
+            "absolute -bottom-4 left-0 right-0 h-1 bg-blue-600 rounded-t-md";
+          btn.appendChild(underline);
+        }
+
+        tabContents.forEach((content) => {
+          content.classList.add("hidden");
+          content.classList.remove("block");
+        });
+
+        const activeTab = document.getElementById(`tab${tabId}`);
+        activeTab.classList.remove("hidden");
+        activeTab.classList.add("block");
+        activeTab.focus({ preventScroll: true });
+      });
+    });
+
+    // --- MAPA DE NÚMEROS POR EXTENSO ---
+    const numerosPorExtenso = { 1: "UM.", 2: "DOIS.", 3: "TRÊS.", 4: "QUATRO.", 5: "CINCO.", 6: "SEIS.", 7: "SETE.", 8: "OITO.", 9: "NOVE.", 10: "DEZ.", 11: "ONZE.", 12: "DOZE.", 13: "TREZE.", 14: "QUATORZE.", 15: "QUINZE.", 16: "DEZESSEIS.", 17: "DEZESSETE.", 18: "DEZOITO.", 19: "DEZENOVE.", 20: "VINTE.", 21: "VINTE E UM.", 22: "VINTE E DOIS.", 23: "VINTE E TRÊS.", 24: "VINTE E QUATRO.", 25: "VINTE E CINCO.", 26: "VINTE E SEIS.", 27: "VINTE E SETE.", 28: "VINTE E OITO.", 29: "VINTE E NOVE.", 30: "TRINTA.", 31: "TRINTA E UM.", 32: "TRINTA E DOIS.", 33: "TRINTA E TRÊS.", 34: "TRINTA E QUATRO.", 35: "TRINTA E CINCO.", 36: "TRINTA E SEIS.", 37: "TRINTA E SETE.", 38: "TRINTA E OITO.", 39: "TRINTA E NOVE.", 40: "QUARENTA.", 41: "QUARENTA E UM.", 42: "QUARENTA E DOIS.", 43: "QUARENTA E TRÊS.", 44: "QUARENTA E QUATRO.", 45: "QUARENTA E CINCO.", 46: "QUARENTA E SEIS.", 47: "QUARENTA E SETE.", 48: "QUARENTA E OITO.", 49: "QUARENTA E NOVE.", 50: "CINQUENTA.", 51: "CINQUENTA E UM.", 52: "CINQUENTA E DOIS.", 53: "CINQUENTA E TRÊS.", 54: "CINQUENTA E QUATRO.", 55: "CINQUENTA E CINCO.", 56: "CINQUENTA E SEIS.", 57: "CINQUENTA E SETE.", 58: "CINQUENTA E OITO.", 59: "CINQUENTA E NOVE.", 60: "SESSENTA.", 61: "SESSENTA E UM.", 62: "SESSENTA E DOIS.", 63: "SESSENTA E TRÊS.", 64: "SESSENTA E QUATRO.", 65: "SESSENTA E CINCO.", 66: "SESSENTA E SEIS.", 67: "SESSENTA E SETE.", 68: "SESSENTA E OITO.", 69: "SESSENTA E NOVE.", 70: "SETENTA.", 71: "SETENTA E UM.", 72: "SETENTA E DOIS.", 73: "SETENTA E TRÊS.", 74: "SETENTA E QUATRO.", 75: "SETENTA E CINCO.", 76: "SETENTA E SEIS.", 77: "SETENTA E SETE.", 78: "SETENTA E OITO.", 79: "SETENTA E NOVE.", 80: "OITENTA.", 81: "OITENTA E UM.", 82: "OITENTA E DOIS.", 83: "OITENTA E TRÊS.", 84: "OITENTA E QUATRO.", 85: "OITENTA E CINCO.", 86: "OITENTA E SEIS.", 87: "OITENTA E SETE.", 88: "OITENTA E OITO.", 89: "OITENTA E NOVE.", 90: "NOVENTA.", 91: "NOVENTA E UM.", 92: "NOVENTA E DOIS.", 93: "NOVENTA E TRÊS.", 94: "NOVENTA E QUATRO.", 95: "NOVENTA E CINCO.", 96: "NOVENTA E SEIS.", 97: "NOVENTA E SETE.", 98: "NOVENTA E OITO.", 99: "NOVENTA E NOVE.", 100: "CEM.", 101:"CENTO E UM.", 102:"CENTO E DOIS.", 103:"CENTO E TRÊS.", 104:"CENTO E QUATRO.", 105:"CENTO E CINCO.", 106:"CENTO E SEIS.", 107:"CENTO E SETE.", 108:"CENTO E OITO.", 109:"CENTO E NOVE.", 110:"CENTO E DEZ.", 111:"CENTO E ONZE.", 112:"CENTO E DOZE.", 113:"CENTO E TREZE.", 114:"CENTO E QUATORZE.", 115:"CENTO E QUINZE.", 116:"CENTO E DEZESSEIS.", 117:"CENTO E DEZESSETE.", 118:"CENTO E DEZOITO.", 119:"CENTO E DEZENOVE.", 120:"CENTO E VINTE.", 121:"CENTO E VINTE E UM.", 122:"CENTO E VINTE E DOIS.", 123:"CENTO E VINTE E TRÊS.", 124:"CENTO E VINTE E QUATRO.", 125:"CENTO E VINTE E CINCO.", 126:"CENTO E VINTE E SEIS.", 127:"CENTO E VINTE E SETE.", 128:"CENTO E VINTE E OITO.", 129:"CENTO E VINTE E NOVE.", 130:"CENTO E TRINTA.", 131:"CENTO E TRINTA E UM.", 132:"CENTO E TRINTA E DOIS.", 133:"CENTO E TRINTA E TRÊS.", 134:"CENTO E TRINTA E QUATRO.", 135:"CENTO E TRINTA E CINCO.", 136:"CENTO E TRINTA E SEIS.", 137:"CENTO E TRINTA E SETE.", 138:"CENTO E TRINTA E OITO.", 139:"CENTO E TRINTA E NOVE.", 140:"QUARENTA.", 141:"CENTO E QUARENTA E UM.", 142:"CENTO E QUARENTA E DOIS.", 143:"CENTO E QUARENTA E TRÊS.", 144:"CENTO E QUARENTA E QUATRO.", 145:"CENTO E QUARENTA E CINCO.", 146:"CENTO E QUARENTA E SEIS.", 147:"CENTO E QUARENTA E SETE.", 148:"CENTO E QUARENTA E OITO.", 149:"CENTO E QUARENTA E NOVE.", 150:"CENTO E CINQUENTA."};
+
+    // Inicia a configuração para ambas as abas
+    setupTab(1);
+    setupTab(2);
+  </script>
+</body>
+</html>
