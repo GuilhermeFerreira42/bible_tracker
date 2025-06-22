@@ -38,6 +38,10 @@
             opacity: 0;
             transition: opacity 0.5s ease-out;
         }
+
+        .accordion-icon.rotate-180 {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans">
@@ -80,6 +84,9 @@
             </header>
 
             <section id="dashboard-content" class="content-section">
+                 <div id="last-read-card" class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+                    </div>
+
                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
                         <h3 class="text-lg font-semibold mb-4">Progresso Geral de Leitura</h3>
@@ -92,6 +99,29 @@
                          <div id="testament-progress-container" class="space-y-3"></div>
                     </div>
                 </div>
+                
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8">
+                    <h3 class="text-lg font-semibold mb-4">Progresso por Livro</h3>
+                    <div id="book-progress-accordion" class="space-y-2">
+                        <div>
+                            <button class="accordion-toggle w-full flex justify-between items-center p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                                <span class="font-semibold text-teal-300">Antigo Testamento</span>
+                                <i class="fas fa-chevron-down accordion-icon transition-transform"></i>
+                            </button>
+                            <div class="accordion-content hidden pt-3 space-y-3 pr-2 max-h-96 overflow-y-auto">
+                                </div>
+                        </div>
+                        <div>
+                            <button class="accordion-toggle w-full flex justify-between items-center p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                                <span class="font-semibold text-teal-300">Novo Testamento</span>
+                                <i class="fas fa-chevron-down accordion-icon transition-transform"></i>
+                            </button>
+                            <div class="accordion-content hidden pt-3 space-y-3 pr-2 max-h-96 overflow-y-auto">
+                                </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8">
                     <h3 class="text-lg font-semibold mb-4">Gerenciamento de Dados</h3>
                     <div class="flex flex-wrap gap-4">
@@ -153,7 +183,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DATABASE AND APP CONFIG ---
     const DB_NAME = 'bible-tracker-db';
-    const DB_VERSION = 4; // Atualizado de 3 para 4
+    const DB_VERSION = 4;
     const CHAPTERS_STORE = 'chapters';
     const COMMENTS_STORE = 'comments';
     const MARKED_DATES_STORE = 'marked_dates';
@@ -229,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
                    commentsOS.createIndex('chapterId', 'chapterId', { unique: false });
                 }
                 
-                // --- Changes for Version 2 ---
                 if (event.oldVersion < 2) {
                     if (!db.objectStoreNames.contains(MARKED_DATES_STORE)) {
                         db.createObjectStore(MARKED_DATES_STORE, { keyPath: 'date' });
@@ -336,7 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chapter) {
             await deleteFromDB(store, chapterId);
         } else {
-            await addToDB(store, { id: chapterId, book: bookName, chapter: chapterNum, read: true, date: today });
+            // Adicionado timestamp para rastrear a última leitura
+            await addToDB(store, { id: chapterId, book: bookName, chapter: chapterNum, read: true, date: today, timestamp: new Date().getTime() });
         }
         await transaction.complete;
         updateUIForChapter(bookName, chapterNum);
@@ -453,9 +483,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function updateDashboardProgress() {
+        // Esta função agora atualiza todos os cards do painel
         const transaction = db.transaction([CHAPTERS_STORE], 'readonly');
         const allReadChapters = await getAllFromDB(transaction.objectStore(CHAPTERS_STORE));
         
+        // Progresso Geral
         const totalChapters = Object.values(BIBLE_BOOKS).flat().reduce((sum, book) => sum + book.chapters, 0);
         const totalRead = allReadChapters.length;
         const overallPercentage = totalChapters > 0 ? (totalRead / totalChapters) * 100 : 0;
@@ -464,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overallProgressBar.style.width = `${overallPercentage}%`;
         overallProgressBar.textContent = `${Math.round(overallPercentage)}%`;
 
+        // Progresso por Testamento
         const testamentProgressContainer = document.getElementById('testament-progress-container');
         testamentProgressContainer.innerHTML = '';
         for (const [testament, books] of Object.entries(BIBLE_BOOKS)) {
@@ -482,7 +515,93 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             testamentProgressContainer.appendChild(div);
         }
+
+        // Chamada para as novas funções de atualização do painel
+        updateLastReadCard(allReadChapters);
+        updateBookProgress(allReadChapters);
     }
+
+    // --- NEW DASHBOARD FUNCTIONS ---
+    async function updateLastReadCard(allReadChapters) {
+        const card = document.getElementById('last-read-card');
+        if (!card) return;
+
+        if (allReadChapters.length === 0) {
+            card.innerHTML = `<h3 class="text-lg font-semibold text-center text-gray-400">Nenhuma leitura registrada. Comece marcando um capítulo!</h3>`;
+            return;
+        }
+
+        allReadChapters.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const lastReadChapter = allReadChapters[0];
+        const bookName = lastReadChapter.book;
+
+        const bookInfo = Object.values(BIBLE_BOOKS).flat().find(b => b.name === bookName);
+        if (!bookInfo) return;
+
+        const readChaptersInBook = new Set(allReadChapters.filter(c => c.book === bookName).map(c => c.chapter));
+        const date = new Date(lastReadChapter.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        let miniGridHTML = '';
+        for (let i = 1; i <= bookInfo.chapters; i++) {
+            const isRead = readChaptersInBook.has(i);
+            miniGridHTML += `<div class="h-8 w-8 flex items-center justify-center rounded text-sm ${isRead ? 'bg-blue-600 text-white' : 'bg-gray-700'}">${i}</div>`;
+        }
+
+        card.innerHTML = `
+            <h3 class="text-lg font-semibold mb-4">Sua Última Leitura</h3>
+            <div class="flex items-center gap-4 p-4 bg-gray-700/50 rounded-lg">
+                <i class="fa-solid fa-book-open text-4xl text-blue-400"></i>
+                <div>
+                    <p class="text-xl font-bold">${lastReadChapter.book} ${lastReadChapter.chapter}</p>
+                    <p class="text-sm text-gray-400">Marcado em: ${date}</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <h4 class="text-md font-semibold mb-3">Progresso em ${bookInfo.name}</h4>
+                <div class="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-12 gap-2">
+                    ${miniGridHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    async function updateBookProgress(allReadChapters) {
+        const accordionContainer = document.getElementById('book-progress-accordion');
+        if (!accordionContainer) return;
+
+        const readCounts = allReadChapters.reduce((acc, ch) => {
+            acc[ch.book] = (acc[ch.book] || 0) + 1;
+            return acc;
+        }, {});
+        
+        const [oldTestamentContent, newTestamentContent] = accordionContainer.querySelectorAll('.accordion-content');
+
+        oldTestamentContent.innerHTML = '';
+        newTestamentContent.innerHTML = '';
+
+        for (const [testament, books] of Object.entries(BIBLE_BOOKS)) {
+            const contentDiv = testament === "Antigo Testamento" ? oldTestamentContent : newTestamentContent;
+            
+            books.forEach(book => {
+                const readCount = readCounts[book.name] || 0;
+                const percentage = book.chapters > 0 ? (readCount / book.chapters) * 100 : 0;
+                
+                const bookProgressHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-1 text-sm">
+                            <span class="font-medium">${book.name}</span>
+                            <span class="text-gray-400">${readCount} / ${book.chapters}</span>
+                        </div>
+                        <div class="w-full bg-gray-600 rounded-full h-2.5">
+                            <div class="bg-teal-500 h-2.5 rounded-full" style="width: ${percentage}%;"></div>
+                        </div>
+                    </div>
+                `;
+                contentDiv.innerHTML += bookProgressHTML;
+            });
+        }
+    }
+
 
     // --- CALENDAR LOGIC ---
     async function getChapterReadDates() {
@@ -493,17 +612,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function getAllMarkedDates() {
-        // Pega todas as fontes de datas "marcadas"
         const chapterDates = await getChapterReadDates();
         const markedTx = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readonly');
         const manualMarked = await getAllFromDB(markedTx.objectStore(MARKED_DATES_STORE));
         const manualMarkedDates = new Set(manualMarked.map(d => d.date));
-
-        // Pega os dias que foram explicitamente desmarcados
         const explicitUnmarked = await getAllFromDB(markedTx.objectStore('explicitly_unmarked_dates'));
         const explicitUnmarkedDates = new Set(explicitUnmarked.map(d => d.date));
 
-        // Lógica final: (Leituras de Capítulo U Marcações Manuais) - Desmarcações Explícitas
         const finalMarkedDates = new Set([...chapterDates, ...manualMarkedDates]);
         explicitUnmarkedDates.forEach(date => finalMarkedDates.delete(date));
 
@@ -511,14 +626,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function toggleMarkedDate(dateStr) {
-        // Primeiro, lemos todas as informações necessárias antes de escrever
         const chapterDates = await getChapterReadDates();
         const markedTxRead = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readonly');
         const isMarkedManually = await getFromDB(markedTxRead.objectStore(MARKED_DATES_STORE), dateStr);
         const isUnmarkedExplicitly = await getFromDB(markedTxRead.objectStore('explicitly_unmarked_dates'), dateStr);
         await markedTxRead.complete;
 
-        // Agora, abrimos uma nova transação apenas para escrever
         const writeTx = db.transaction([MARKED_DATES_STORE, 'explicitly_unmarked_dates'], 'readwrite');
         const markedStore = writeTx.objectStore(MARKED_DATES_STORE);
         const unmarkedStore = writeTx.objectStore('explicitly_unmarked_dates');
@@ -631,14 +744,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const uploadBtn = document.getElementById('upload-data-btn');
         const uploadInput = document.getElementById('upload-input');
 
-        // Listener para o botão de Download
         if (downloadBtn) {
             downloadBtn.addEventListener('click', async () => {
                 try {
-                    // Abre uma única transação de leitura para todas as tabelas, o que é mais seguro.
                     const tx = db.transaction([CHAPTERS_STORE, COMMENTS_STORE, MARKED_DATES_STORE, 'notes', 'explicitly_unmarked_dates'], 'readonly');
                     
-                    // Usa Promise.all para buscar todos os dados em paralelo
                     const [chapters, comments, marked_dates, notes, explicitly_unmarked_dates] = await Promise.all([
                         getAllFromDB(tx.objectStore(CHAPTERS_STORE)),
                         getAllFromDB(tx.objectStore(COMMENTS_STORE)),
@@ -648,7 +758,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     ]);
                     await tx.complete;
 
-                    // Monta o objeto de backup completo, garantindo que tudo seja incluído
                     const backupData = { chapters, comments, marked_dates, notes, explicitly_unmarked_dates };
                     
                     const dataStr = JSON.stringify(backupData, null, 2);
@@ -667,12 +776,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Listener para o botão de Upload, que aciona o input de arquivo escondido
         if (uploadBtn) {
             uploadBtn.addEventListener('click', () => uploadInput.click());
         }
 
-        // Listener para quando um arquivo é selecionado no input
         if (uploadInput) {
             uploadInput.addEventListener('change', e => {
                 const file = e.target.files[0];
@@ -681,7 +788,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 reader.onload = async (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        // Verifica se o arquivo de backup contém as chaves essenciais
                         if (!data.chapters || !data.comments) {
                             throw new Error('Formato de arquivo de backup inválido. Faltam dados essenciais.');
                         }
@@ -690,7 +796,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             return;
                         }
                         
-                        // Lista de todas as tabelas que serão restauradas
                         const storesToRestore = [
                             { name: CHAPTERS_STORE, data: data.chapters },
                             { name: COMMENTS_STORE, data: data.comments },
@@ -700,7 +805,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         ];
 
                         for(const storeInfo of storesToRestore) {
-                            // Verifica se a store existe antes de tentar acessá-la
                             if (db.objectStoreNames.contains(storeInfo.name)) {
                                 const tx = db.transaction(storeInfo.name, 'readwrite');
                                 const store = tx.objectStore(storeInfo.name);
@@ -724,28 +828,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- NOVA FUNÇÃO PARA LIMPAR TODOS OS DADOS ---
     async function handleClearAllData() {
-        // Exibe uma caixa de confirmação dupla para segurança
         const confirmationText = "Você tem CERTEZA que deseja apagar TODOS os dados do Bible Tracker? Esta ação é irreversível e removerá todo o seu progresso, comentários e anotações.";
         if (!confirm(confirmationText)) {
             return;
         }
-        // Segunda confirmação para evitar cliques acidentais
         if (!confirm("Confirmação final: Apagar todos os dados agora?")) {
             return;
         }
 
         try {
-            // Fecha a conexão com o banco de dados, se estiver aberta, para permitir a exclusão
             if (db) {
                 db.close();
             }
 
-            // Solicita a exclusão do banco de dados inteiro pelo nome
             const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
 
-            // Usa uma Promise para aguardar o resultado da operação
             await new Promise((resolve, reject) => {
                 deleteRequest.onsuccess = () => {
                     console.log(`Banco de dados '${DB_NAME}' apagado com sucesso.`);
@@ -762,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             alert('Todos os dados foram apagados com sucesso! A página será recarregada.');
-            location.reload(); // Recarrega a página para iniciar do zero
+            location.reload();
 
         } catch (error) {
             alert(`Ocorreu um erro ao tentar apagar os dados: ${error.message}`);
@@ -771,17 +869,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS & NAVIGATION ---
     function setupEventListeners() {
-        setupDataManagementListeners(); // Adiciona os listeners de gerenciamento de dados
+        setupDataManagementListeners();
 
         document.getElementById('hamburger-button').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('-translate-x-full'));
         document.getElementById('nav-menu').addEventListener('click', handleNavClick);
         
-        // Adiciona o listener para o botão de limpeza
         const clearDataBtn = document.getElementById('clear-data-btn');
         if (clearDataBtn) {
             clearDataBtn.addEventListener('click', handleClearAllData);
         }
         
+        // Listener para o acordeão
+        const accordion = document.getElementById('book-progress-accordion');
+        if (accordion) {
+            accordion.addEventListener('click', (e) => {
+                const toggleBtn = e.target.closest('.accordion-toggle');
+                if (toggleBtn) {
+                    const content = toggleBtn.nextElementSibling;
+                    const icon = toggleBtn.querySelector('.accordion-icon');
+                    content.classList.toggle('hidden');
+                    icon.classList.toggle('rotate-180');
+                }
+            });
+        }
+
         bookPagesContainer.addEventListener('click', e => {
             const chapterBtn = e.target.closest('.chapter-button');
             if (chapterBtn) {
@@ -985,7 +1096,8 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 1; i <= book.chapters; i++) {
             const chapterId = `${bookName}-${i}`;
             if (markAsRead) {
-                await store.put({ id: chapterId, book: bookName, chapter: i, read: true, date: today });
+                // Adicionado timestamp também na marcação em massa
+                await store.put({ id: chapterId, book: bookName, chapter: i, read: true, date: today, timestamp: new Date().getTime() });
             } else {
                 await store.delete(chapterId);
             }
@@ -1000,14 +1112,12 @@ document.addEventListener('DOMContentLoaded', () => {
         listContainer.innerHTML = '<p class="text-gray-400">Carregando...</p>';
 
         try {
-            // Usa Promise.all para buscar dados de ambas as fontes em paralelo
             const [bookComments, notes] = await Promise.all([
                 getAllFromDB(db.transaction(COMMENTS_STORE, 'readonly').objectStore(COMMENTS_STORE)),
                 getAllFromDB(db.transaction('notes', 'readonly').objectStore('notes'))
             ]);
 
             const formattedBookComments = bookComments.map(c => {
-                // Adiciona uma verificação para o capítulo '0' (comentário geral)
                 const chapterLabel = c.chapterId.endsWith('-0')
                     ? 'Geral'
                     : `Cap. ${c.chapterId.split('-')[1]}`;
@@ -1056,26 +1166,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         try {
             await openDB();
-            createBookButtonsAndPages(); // Tarefa pesada
+            createBookButtonsAndPages();
             setupEventListeners();
             await updateUIForAllBooks();
             document.querySelector('.nav-button[data-target="dashboard"]').click();
 
-            // Pega o elemento de carregamento
             const loadingOverlay = document.getElementById('loading-overlay');
             if (loadingOverlay) {
-                // Adiciona a classe para iniciar o efeito de fade-out
                 loadingOverlay.classList.add('fade-out');
-                
-                // Remove o elemento do DOM após a animação para não atrapalhar os cliques
                 setTimeout(() => {
                     loadingOverlay.style.display = 'none';
-                }, 500); // O tempo deve ser o mesmo da transição do CSS
+                }, 500);
             }
 
         } catch (error) {
             console.error('Falha na inicialização:', error);
-            // Em caso de erro, também esconde o loading para mostrar a mensagem
             const loadingOverlay = document.getElementById('loading-overlay');
             if(loadingOverlay) loadingOverlay.style.display = 'none';
             
