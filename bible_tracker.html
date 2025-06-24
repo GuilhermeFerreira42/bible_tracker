@@ -16,6 +16,11 @@
         .calendar-day.read { background-color: #2563eb; color: white; border-radius: 50%; }
         .comment-card { border-left: 4px solid #3b82f6; }
 
+        /* Regra específica para resolver conflito de hover em botões marcados como lidos */
+        .chapter-button.read:hover {
+            background-color: #1d4ed8; /* Um azul um pouco mais escuro para o feedback no hover */
+        }
+
         /* Estilos para o spinner (círculo giratório) */
         .spinner {
             width: 56px;
